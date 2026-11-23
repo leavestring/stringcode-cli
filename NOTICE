@@ -1,0 +1,22 @@
+String Code CLI
+Copyright (C) 2026 leavestring
+
+Official project: https://github.com/leavestring/stringcode-cli
+
+This project is licensed under the GNU General Public License, version 3
+only. See LICENSE for the complete license text.
+
+Additional terms under GPLv3 section 7 apply to material by leavestring
+whose source files refer to this notice:
+
+- Section 7(b): Preserve the following author attribution in that material
+  or in the Appropriate Legal Notices displayed by works containing it:
+  "Original String Code CLI project by leavestring."
+- Section 7(c): Do not misrepresent the origin of that material. Mark
+  modified versions of that material in a reasonable way so they are
+  distinguishable from the original version.
+- Section 7(e): This license does not grant trademark rights in the String
+  Code or String Code CLI names or project logo.
+
+Existing third-party copyright and license notices apply to their respective
+materials. See README.md for the desktop project and revision used by the CLI.

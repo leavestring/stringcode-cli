@@ -1,0 +1,49 @@
+{
+  "name": "stringcode-cli",
+  "version": "0.4.0",
+  "description": "A Windows Terminal coding agent with your own model provider and PowerShell approvals",
+  "type": "module",
+  "bin": {
+    "stringcode": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/cli.js",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "diff": "8.0.4",
+    "proper-lockfile": "4.1.2",
+    "string-width": "7.2.0",
+    "wrap-ansi": "9.0.2",
+    "yaml": "2.9.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/proper-lockfile": "4.1.4",
+    "typescript": "6.0.3"
+  },
+  "author": {
+    "url": "https://github.com/leavestring",
+    "name": "leavestring"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leavestring/stringcode-cli.git"
+  },
+  "license": "GPL-3.0-only",
+  "homepage": "https://github.com/leavestring/stringcode-cli#readme",
+  "bugs": {
+    "url": "https://github.com/leavestring/stringcode-cli/issues"
+  }
+}
