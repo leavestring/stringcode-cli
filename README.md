@@ -1,5 +1,7 @@
 # String Code CLI · 弦码终端版
 
+[![简体中文](https://img.shields.io/badge/%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-%E5%BD%93%E5%89%8D%E8%AF%AD%E8%A8%80-0969da?style=flat-square)](README.md) [![English](https://img.shields.io/badge/English-switch%20language-57606a?style=flat-square)](README.en.md)
+
 **为 Windows Terminal 和 PowerShell 打造的本地编程 Agent。** 由 [leavestring](https://github.com/leavestring) 发起并维护。
 
 在项目目录里启动 `stringcode`，接入你自己的 OpenAI 兼容模型。它可以读取和搜索工作区、展示文件修改预览、运行 PowerShell，并在下次启动时接着上一次会话。
