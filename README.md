@@ -8,10 +8,10 @@
 
 ## 安装
 
-需要 **Windows、Node.js 24+ 和 npm**。从 [GitHub Releases](https://github.com/leavestring/stringcode-cli/releases) 下载 `stringcode-cli-0.4.0.tgz`，在下载目录打开 PowerShell：
+需要 **Windows、Node.js 24+ 和 npm**。在 PowerShell 中运行以下命令，从 [npm](https://www.npmjs.com/package/stringcode-cli) 安装。
 
 ~~~powershell
-npm install -g .\stringcode-cli-0.4.0.tgz
+npm install -g stringcode-cli
 stringcode --version
 ~~~
 
@@ -21,7 +21,15 @@ stringcode --version
 stringcode
 ~~~
 
-首次启动时输入模型服务的 **OpenAI 兼容 Base URL**（例如 `https://provider.example/v1`）和 **API Key**，然后选模型。模型列表不可用时按 `m` 手动输入模型 ID。使用文件和 PowerShell 工具需要模型支持流式输出和工具调用。之后可用 `/provider` 切换服务商，用 `/model` 切换模型。
+首次启动时输入模型服务的 **OpenAI 兼容 Base URL**（例如 `https://provider.example/v1`）和 **API Key**，然后选模型。模型列表不可用时，可以手动输入模型 ID。使用文件和 PowerShell 工具需要模型支持流式输出和工具调用。之后可用 `/provider` 切换服务商，用 `/model` 切换模型。
+
+### 从 GitHub Release 安装
+
+也可以从 [GitHub Releases](https://github.com/leavestring/stringcode-cli/releases) 下载 `stringcode-cli-0.4.0.tgz`，在下载目录打开 PowerShell 并运行以下命令。
+
+~~~powershell
+npm install -g .\stringcode-cli-0.4.0.tgz
+~~~
 
 ## 试一个任务
 

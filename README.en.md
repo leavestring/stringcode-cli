@@ -8,10 +8,10 @@ Run `stringcode` in a project folder and connect your own OpenAI-compatible mode
 
 ## Install
 
-You need **Windows, Node.js 24 or later, and npm**. Download `stringcode-cli-0.4.0.tgz` from [GitHub Releases](https://github.com/leavestring/stringcode-cli/releases), then run these commands in PowerShell from your downloads folder.
+You need **Windows, Node.js 24 or later, and npm**. Run the following in PowerShell to install from [npm](https://www.npmjs.com/package/stringcode-cli).
 
 ~~~powershell
-npm install -g .\stringcode-cli-0.4.0.tgz
+npm install -g stringcode-cli
 stringcode --version
 ~~~
 
@@ -22,6 +22,14 @@ stringcode
 ~~~
 
 On first launch, enter your provider's **OpenAI-compatible Base URL** (for example, `https://provider.example/v1`) and **API key**, then select a model. If the model list is unavailable, enter the model ID manually. Choose a model with streaming and tool-call support to use the file and PowerShell tools. Use `/provider` or `/model` to change them later.
+
+### Install from GitHub Releases
+
+You can also download `stringcode-cli-0.4.0.tgz` from [GitHub Releases](https://github.com/leavestring/stringcode-cli/releases) and run the following command in PowerShell from the download directory.
+
+~~~powershell
+npm install -g .\stringcode-cli-0.4.0.tgz
+~~~
 
 ## Try a task
 
