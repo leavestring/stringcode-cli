@@ -15,10 +15,9 @@ npm install -g .\stringcode-cli-0.4.0.tgz
 stringcode --version
 ~~~
 
-进入要处理的项目目录，再启动：
+进入要处理的项目目录，打开终端输入：
 
 ~~~powershell
-Set-Location 'D:\path\to\your-project'
 stringcode
 ~~~
 

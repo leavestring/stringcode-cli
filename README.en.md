@@ -15,10 +15,9 @@ npm install -g .\stringcode-cli-0.4.0.tgz
 stringcode --version
 ~~~
 
-Start String Code from the project you want to work on.
+Open a terminal in the project folder you want to work on and run:
 
 ~~~powershell
-Set-Location 'D:\path\to\your-project'
 stringcode
 ~~~
 
