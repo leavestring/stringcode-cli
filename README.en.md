@@ -44,7 +44,7 @@ Enter `/provider add` at the String Code CLI prompt and fill in the fields below
 | Field | Value |
 | --- | --- |
 | Base URL | `http://127.0.0.1:3425/v1`. If you changed the gateway port, use that port and keep `/v1` |
-| Provider name | `Magpie` |
+| Provider name (custom, optional) | For example, `Magpie`. Press Enter to use the hostname from the Base URL, which is `127.0.0.1` for the default address |
 | API key | Use `magpie-stringcodecli` for a gateway on the same machine so magpie can identify requests from String Code CLI |
 | Model | Pick a model from the gateway's list, or enter the full model ID, including the `provider/` prefix |
 

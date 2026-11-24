@@ -44,7 +44,7 @@ String Code CLI 支持把 magpie 的本地 OpenAI 兼容网关添加为模型供
 | 配置项 | 填写内容 |
 | --- | --- |
 | Base URL | `http://127.0.0.1:3425/v1`。如果修改过网关端口，换成实际端口，保留 `/v1` |
-| Provider name | `Magpie` |
+| Provider name（自定义，可留空） | 例如 `Magpie`。直接按 Enter 使用 Base URL 的主机名，默认地址对应 `127.0.0.1` |
 | API Key | 同机接入时填 `magpie-stringcodecli`，用于在 magpie 中识别 String Code CLI 的请求 |
 | Model | 从网关返回的列表中选择模型，手动输入时填写完整模型 ID，包括 `provider/` 前缀 |
 
