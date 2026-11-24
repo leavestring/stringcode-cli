@@ -31,6 +31,23 @@ You can also download `stringcode-cli-0.4.0.tgz` from [GitHub Releases](https://
 npm install -g .\stringcode-cli-0.4.0.tgz
 ~~~
 
+## Connect to magpie
+
+String Code CLI can use magpie's local OpenAI-compatible gateway as a model provider. Enable the providers you want in magpie and keep the gateway running.
+
+Enter `/provider add` at the String Code CLI prompt and fill in the fields below. On first launch, enter the gateway URL and API key in the setup prompt, then select a model.
+
+| Field | Value |
+| --- | --- |
+| Base URL | `http://127.0.0.1:3425/v1`. If you changed the gateway port, use that port and keep `/v1` |
+| Provider name | `Magpie` |
+| API key | Use `magpie-stringcodecli` for a gateway on the same machine so magpie can identify requests from String Code CLI |
+| Model | Pick a model from the gateway's list, or enter the full model ID, including the `provider/` prefix |
+
+For example, you can choose a WorkBuddy model if it appears in magpie's model list. Use `/model` to switch models or `/provider` to switch providers. Model availability depends on the providers enabled in magpie. Choose a model with streaming and tool-call support to use the file and PowerShell tools.
+
+If the model list is empty, check that magpie is running and that the gateway's `/v1/models` includes your model. When you use a cloud model, magpie forwards model requests to the selected provider. [magpie gateway integration guide](https://usemagpie.ai/docs/integrate)
+
 ## Try a task
 
 Try this prompt in a test project.

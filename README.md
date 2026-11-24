@@ -31,6 +31,23 @@ stringcode
 npm install -g .\stringcode-cli-0.4.0.tgz
 ~~~
 
+## 通过 magpie 接入模型
+
+String Code CLI 支持把 magpie 的本地 OpenAI 兼容网关添加为模型供应商。先在 magpie 中启用所需的供应商，并保持网关运行。
+
+在 String Code CLI 的输入框里输入 `/provider add`，按提示填写以下各项。首次启动时可直接在初始配置中填写网关地址和 API Key，再选择模型。
+
+| 配置项 | 填写内容 |
+| --- | --- |
+| Base URL | `http://127.0.0.1:3425/v1`。如果修改过网关端口，换成实际端口，保留 `/v1` |
+| Provider name | `Magpie` |
+| API Key | 同机接入时填 `magpie-stringcodecli`，用于在 magpie 中识别 String Code CLI 的请求 |
+| Model | 从网关返回的列表中选择模型，手动输入时填写完整模型 ID，包括 `provider/` 前缀 |
+
+例如，如果 magpie 的模型列表里有 WorkBuddy 供应商提供的模型，可以直接选择它。用 `/model` 可切换模型，用 `/provider` 可切换供应商。模型可用性取决于 magpie 中启用的供应商，文件和 PowerShell 工具需要所选模型支持流式输出和工具调用。
+
+如果模型列表为空，先确认 magpie 正在运行，并检查所需模型是否出现在网关的 `/v1/models` 中。使用云模型时，magpie 会将模型请求转发给所选供应商。 [magpie 网关接入文档](https://usemagpie.ai/docs/zh/integrate)
+
 ## 试一个任务
 
 在测试项目里输入：
