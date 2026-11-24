@@ -15,14 +15,6 @@ npm install -g stringcode-cli
 stringcode --version
 ~~~
 
-Open a terminal in the project folder you want to work on and run:
-
-~~~powershell
-stringcode
-~~~
-
-On first launch, enter your provider's **OpenAI-compatible Base URL** (for example, `https://provider.example/v1`) and **API key**, then select a model. If the model list is unavailable, enter the model ID manually. Choose a model with streaming and tool-call support to use the file and PowerShell tools. Use `/provider` or `/model` to change them later.
-
 ### Install from GitHub Releases
 
 You can also download `stringcode-cli-0.4.0.tgz` from [GitHub Releases](https://github.com/leavestring/stringcode-cli/releases) and run the following command in PowerShell from the download directory.
@@ -31,7 +23,19 @@ You can also download `stringcode-cli-0.4.0.tgz` from [GitHub Releases](https://
 npm install -g .\stringcode-cli-0.4.0.tgz
 ~~~
 
-## Connect to magpie
+## Connect a model
+
+Open a terminal in the project folder you want to work on and run:
+
+~~~powershell
+stringcode
+~~~
+
+### Connect directly to an OpenAI-compatible provider
+
+On first launch, enter your provider's **OpenAI-compatible Base URL** (for example, `https://provider.example/v1`) and **API key**, then select a model. If the model list is unavailable, enter the model ID manually. Choose a model with streaming and tool-call support to use the file and PowerShell tools. Use `/provider` or `/model` to change them later.
+
+### Connect to magpie
 
 String Code CLI can use magpie's local OpenAI-compatible gateway as a model provider. Enable the providers you want in magpie and keep the gateway running.
 
