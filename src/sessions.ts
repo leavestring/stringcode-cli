@@ -166,6 +166,35 @@ export class Sessions {
   }
 }
 
+interface ToolActivity {
+  call: ToolCall
+  result?: string
+}
+
+export function lastTurnTools(events: SessionEvent[]): ToolActivity[] {
+  const start = events.findLastIndex(({ data }) => data.type === "user/message")
+  const tools: ToolActivity[] = []
+  if (start < 0) return tools
+
+  const batch = new Map<string, ToolActivity>()
+  for (const { data } of events.slice(start + 1)) {
+    if (data.type === "assistant/message") {
+      batch.clear()
+      for (const call of data.toolCalls) {
+        const entry = { call }
+        batch.set(call.id, entry)
+        tools.push(entry)
+      }
+    } else if (data.type === "tool/result") {
+      const entry = batch.get(data.callId)
+      if (entry) entry.result = data.content
+    } else if (data.type === "turn/end") {
+      break
+    }
+  }
+  return tools
+}
+
 export function deriveModelMessages(events: SessionEvent[], reasoningModel?: string): ModelMessage[] {
   const messages: ModelMessage[] = []
   let pending: ToolCall[] = []
@@ -190,6 +219,7 @@ export function deriveModelMessages(events: SessionEvent[], reasoningModel?: str
     } else if (data.type === "assistant/message") {
       finishBatch()
       pending = data.toolCalls
+      if (!pending.length && !data.content?.trim()) continue
       messages.push({
         role: "assistant",
         content: data.content || null,

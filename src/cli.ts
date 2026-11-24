@@ -10,14 +10,14 @@ import { efforts, helpText, type Effort } from "./commands.js"
 import { dataDirectory, newProvider, ProviderStore, type Provider } from "./config.js"
 import { manualCompact, skillBudget } from "./context.js"
 import { Credentials, type CredentialOwner } from "./credentials.js"
-import { fetchModelIds } from "./model.js"
-import { Sessions, type Session } from "./sessions.js"
+import { fetchModelIds, type ModelCompatibility } from "./model.js"
+import { lastTurnTools, Sessions, type Session } from "./sessions.js"
 import { canRunSetup, checkConfigForKey, pickModel, promptKey, promptProvider } from "./setup.js"
 import { loadSkill } from "./skills.js"
 import { cycleMode, Terminal } from "./terminal.js"
 import type { Mode } from "./types.js"
 import { clip, isMissing, messageOf, redact, terminalText, writeAtomic } from "./util.js"
-import { createWebSearch, searchCredential } from "./web-search.js"
+import { createWebSearch, searchCredential, webSearchStatus } from "./web-search.js"
 import { Workspace } from "./workspace.js"
 
 const usage = [
@@ -125,16 +125,24 @@ async function chat(
   let searchEnabled = true
   const searchDisabledFile = path.join(dataDir, "web-search.disabled")
   const unavailableEfforts = new Set<string>()
+  const compatibilityByModel = new Map<string, ModelCompatibility>()
   const protect = (text: string) => redact(redact(text, searchKey ?? ""), apiKey)
+  const activeSearch = () => searchEnabled ? createWebSearch(searchKey) : undefined
 
   const active = () => {
     const model = session.model ?? provider.model
     const config = model === provider.model ? provider : { baseUrl: provider.baseUrl, model }
+    const modelKey = JSON.stringify([provider.id, config.baseUrl, model])
+    let compatibility = compatibilityByModel.get(modelKey)
+    if (!compatibility) {
+      compatibility = {}
+      compatibilityByModel.set(modelKey, compatibility)
+    }
     const effortKey = JSON.stringify([provider.id, model, session.effort])
     const effortUnavailable = unavailableEfforts.has(effortKey)
     return {
       config, apiKey, mode, session, workspace, effortUnavailable,
-      webSearch: searchEnabled ? createWebSearch(searchKey) : undefined,
+      webSearch: activeSearch(), compatibility,
       effort: effortUnavailable ? "auto" as const : session.effort,
       onEffortUnavailable() {
         unavailableEfforts.add(effortKey)
@@ -211,6 +219,7 @@ async function chat(
         const key = await verifiedKey(terminal, provider, signal)
         if (!key) return
         await remember(terminal, credentials, provider, key, true)
+        if (key !== apiKey) compatibilityByModel.clear()
         apiKey = key
       })
       return
@@ -249,9 +258,7 @@ async function chat(
     terminal.notice("Provider: " + provider.name + "  ·  Model: " + provider.model)
   }
 
-  const searchStatus = () => searchEnabled
-    ? "Web search is on (AnySearch, " + (searchKey ? "API key" : "anonymous") + ")."
-    : "Web search is off. Use /search on to enable it."
+  const searchStatus = () => webSearchStatus(activeSearch())
 
   const setSearchEnabled = async (enabled: boolean) => {
     if (enabled) await rm(searchDisabledFile, { force: true })
@@ -341,25 +348,22 @@ async function chat(
         break
       }
       case "/tools": {
-        const start = session.events.findLastIndex(({ data }) => data.type === "user/message")
-        const latest = start < 0 ? [] : session.events.slice(start)
-        const calls = latest.flatMap(({ data }) => data.type === "assistant/message" ? data.toolCalls : [])
-        if (!calls.length) {
+        const activity = lastTurnTools(session.events)
+        if (!activity.length) {
           terminal.notice("The last turn has no tool activity.")
           break
         }
         const chosen = await interact(terminal, (signal) => terminal.pick("Last turn / tools",
-          calls.map((call, index) => ({
+          activity.map(({ call }, index) => ({
             id: String(index), label: String(index + 1) + ". " + call.name,
             detail: call.name === "WebSearch" ? protect(call.arguments).replace(/\s+/gu, " ") : undefined,
           })),
           undefined, signal))
         if (chosen !== undefined) {
-          const call = calls[Number(chosen)]
-          const result = latest.findLast(({ data }) => data.type === "tool/result" && data.callId === call.id)?.data
+          const { call, result } = activity[Number(chosen)]
           const input = ["Shell", "WebSearch"].includes(call.name) ? "\nArguments: " + clip(protect(call.arguments), 3_500) : ""
-          terminal.notice(call.name + input + "\n" + (result?.type === "tool/result"
-            ? clip(protect(result.content), 12_000) : "No result was recorded."))
+          terminal.notice(call.name + input + "\n" + (result === undefined
+            ? "No result was recorded." : clip(protect(result), 12_000)))
         }
         break
       }

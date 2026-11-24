@@ -34,7 +34,8 @@ test("the CLI works from a different cwd, configures the endpoint and keeps secr
   const invoke = (...args) => run(process.execPath, [cli, ...args], options)
   assert.match((await invoke("--help")).stdout, /stringcode \[--resume/)
   assert.match((await invoke("--help")).stdout, /Original String Code CLI project by leavestring/)
-  assert.equal((await invoke("--version")).stdout.trim(), "0.4.0")
+  const { version } = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"))
+  assert.equal((await invoke("--version")).stdout.trim(), version)
   const license = (await invoke("--license")).stdout
   assert.match(license, /Original String Code CLI project by leavestring/)
   assert.match(license, /GNU GENERAL PUBLIC LICENSE/)

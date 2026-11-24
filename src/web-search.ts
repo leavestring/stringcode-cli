@@ -16,7 +16,17 @@ const responseSchema = z.object({
 })
 
 export const searchCredential = { id: "web-search:anysearch", baseUrl }
-export type WebSearch = (query: string, signal: AbortSignal) => Promise<string>
+export interface WebSearch {
+  (query: string, signal: AbortSignal): Promise<string>
+  readonly authentication: "key" | "anonymous"
+}
+
+export function webSearchStatus(search?: WebSearch): string {
+  if (!search) return "AnySearch web search is off. Use /search on to enable it."
+  return search.authentication === "key"
+    ? "AnySearch web search is on with an API key configured."
+    : "AnySearch web search is on in anonymous mode."
+}
 
 function responseError(status: number, authenticated: boolean): string {
   switch (status) {
@@ -31,7 +41,7 @@ function responseError(status: number, authenticated: boolean): string {
 }
 
 export function createWebSearch(apiKey = "", request: typeof fetch = fetch): WebSearch {
-  return async (query, signal) => {
+  const search = async (query: string, signal: AbortSignal): Promise<string> => {
     if (apiKey && query.includes(apiKey)) throw new Error("The search query contains the search API key.")
     const timeout = AbortSignal.timeout(15_000)
     const requestSignal = AbortSignal.any([signal, timeout])
@@ -73,4 +83,5 @@ export function createWebSearch(apiKey = "", request: typeof fetch = fetch): Web
     return ["Found " + results.length + (results.length === 1 ? " web result." : " web results."),
       ...results.map((result, index) => (index + 1) + ". " + result)].join("\n\n")
   }
+  return Object.assign(search, { authentication: apiKey ? "key" as const : "anonymous" as const })
 }

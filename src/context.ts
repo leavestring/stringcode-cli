@@ -193,11 +193,16 @@ export function buildContext(options: {
   tools: ToolDefinition[]
   contextWindow?: number
   reasoningModel?: string
+  searchStatus?: string
   finalInstruction?: string
 }): { messages: ModelMessage[]; snapshot: Snapshot; checkpoint?: ContextCheckpoint } {
   const { checkpoint, turns } = transcript(options.events, options.reasoningModel)
-  const system = systemPrompt(options.workspace, options.mode, options.planApproved, options.skills) +
-    (options.finalInstruction ? "\n\n" + options.finalInstruction : "")
+  const system = [
+    systemPrompt(options.workspace, options.mode, options.planApproved, options.skills),
+    options.searchStatus && options.searchStatus + " The user can enter /search to inspect it or /search key to configure it. " +
+      "These commands run at the String Code prompt. Direct the user there for configuration and keep keys out of chat.",
+    options.finalInstruction,
+  ].filter(Boolean).join("\n\n")
   const window = options.contextWindow ?? 32_000
   const outputReserve = Math.min(8_192, Math.max(256, Math.floor(window * 0.1)))
   const inputLimit = window - outputReserve - Math.min(2_048, Math.ceil(window * 0.04))

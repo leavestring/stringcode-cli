@@ -16,6 +16,13 @@ interface Completion {
   toolsEnabled: boolean
 }
 
+type OutputTokenField = "max_tokens" | "max_completion_tokens"
+
+export interface ModelCompatibility {
+  streamUsage?: false
+  outputTokenField?: OutputTokenField | null
+}
+
 interface Choice {
   delta?: Delta
   message?: Delta
@@ -203,6 +210,7 @@ export async function complete(options: {
   messages: ModelMessage[]
   tools: ToolDefinition[]
   outputLimit: number
+  compatibility?: ModelCompatibility
   effort?: Effort
   onEffortUnavailable?: () => void
   signal: AbortSignal
@@ -210,13 +218,13 @@ export async function complete(options: {
   onThinking: () => void
   onNotice: (notice: string) => void
 }): Promise<Completion> {
-  const { config, apiKey, signal, messages, tools } = options
+  const { config, apiKey, signal, messages, tools, compatibility } = options
   const host = new URL(config.baseUrl).hostname
   let effort = options.effort ?? "auto"
-  let outputField = host === "api.openai.com" ? "max_completion_tokens" : "max_tokens"
-  let outputLimit: number | undefined = options.outputLimit
+  let outputField = compatibility?.outputTokenField
+  if (outputField === undefined) outputField = host === "api.openai.com" ? "max_completion_tokens" : "max_tokens"
   let triedAlternate = false
-  let includeUsage = true
+  let includeUsage = compatibility?.streamUsage !== false
   let includeTools = tools.length > 0
   for (let attempt = 0; attempt < 6; attempt += 1) {
     const timeout = AbortSignal.timeout(180_000)
@@ -226,7 +234,7 @@ export async function complete(options: {
       messages,
       stream: true,
       ...(includeUsage ? { stream_options: { include_usage: true } } : {}),
-      ...(outputLimit ? { [outputField]: outputLimit } : {}),
+      ...(outputField && options.outputLimit ? { [outputField]: options.outputLimit } : {}),
       ...(effort === "auto" ? {} : host === "openrouter.ai"
         ? { reasoning: { effort } } : { reasoning_effort: effort }),
       ...(includeTools ? { tools, tool_choice: "auto" } : {}),
@@ -240,9 +248,14 @@ export async function complete(options: {
         body: JSON.stringify(body),
       })
       if (response.ok) {
-        return await consume(response, apiKey, options.onText, options.onThinking, includeTools).finally(async () => {
+        const result = await consume(response, apiKey, options.onText, options.onThinking, includeTools).finally(async () => {
           await response.body?.cancel().catch(() => {})
         })
+        if (compatibility) {
+          if (!includeUsage) compatibility.streamUsage = false
+          if (options.outputLimit) compatibility.outputTokenField = outputField
+        }
+        return result
       }
       const detail = providerErrorText(await response.text(), apiKey)
       if (response.status === 400 || response.status === 422) {
@@ -258,9 +271,8 @@ export async function complete(options: {
           includeUsage = false
           continue
         }
-        if (unsupported && outputLimit && detail.includes(outputField)) {
-          if (triedAlternate) outputLimit = undefined
-          outputField = outputField === "max_tokens" ? "max_completion_tokens" : "max_tokens"
+        if (unsupported && outputField && options.outputLimit && new RegExp("\\b" + outputField + "\\b", "i").test(detail)) {
+          outputField = triedAlternate ? null : outputField === "max_tokens" ? "max_completion_tokens" : "max_tokens"
           triedAlternate = true
           continue
         }

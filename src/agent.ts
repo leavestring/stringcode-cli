@@ -4,12 +4,12 @@
 import { randomUUID } from "node:crypto"
 import { buildContext } from "./context.js"
 import type { Effort } from "./commands.js"
-import { complete } from "./model.js"
+import { complete, type ModelCompatibility } from "./model.js"
 import type { Session } from "./sessions.js"
 import { availableTools } from "./tools.js"
 import type { Approval, Mode, ModelConfig, Snapshot, ToolCall, Usage } from "./types.js"
 import { messageOf, redact } from "./util.js"
-import type { WebSearch } from "./web-search.js"
+import { webSearchStatus, type WebSearch } from "./web-search.js"
 import type { Workspace } from "./workspace.js"
 
 export interface AgentUI {
@@ -31,6 +31,7 @@ export interface AgentOptions {
   mode: Mode
   effort?: Effort
   webSearch?: WebSearch
+  compatibility?: ModelCompatibility
   onEffortUnavailable?: () => void
 }
 
@@ -45,6 +46,7 @@ export function sessionContext(options: Omit<AgentOptions, "apiKey">, approved =
     events: session.events, workspace: workspace.root, mode, planApproved: approved,
     skills: session.skills, tools, contextWindow: config.contextWindow,
     reasoningModel: new URL(config.baseUrl).hostname === "api.deepseek.com" ? config.model : undefined,
+    searchStatus: webSearchStatus(webSearch),
     finalInstruction: finalizing ? finalInstruction : undefined,
   })
 }
@@ -92,6 +94,7 @@ export async function runTurn(
   ui: AgentUI,
 ): Promise<"complete" | "canceled" | "limit"> {
   const { apiKey, mode, session, workspace, webSearch } = options
+  const compatibility = options.compatibility ?? {}
   let approved = false
   let effort = options.effort ?? "auto"
   let reason: "complete" | "canceled" | "error" | "limit" = "error"
@@ -122,6 +125,7 @@ export async function runTurn(
         config: options.config, apiKey, messages: packed.messages, signal: requestSignal,
         tools: requestedTools.map((entry) => entry.definition),
         outputLimit: packed.snapshot.outputReserve,
+        compatibility,
         effort,
         onEffortUnavailable: () => {
           effort = "auto"

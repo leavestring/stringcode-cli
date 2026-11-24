@@ -8,10 +8,10 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import test from "node:test"
 import { setTimeout as delay } from "node:timers/promises"
-import { runTurn, latestUsage } from "../dist/agent.js"
+import { runTurn, latestUsage, sessionContext } from "../dist/agent.js"
 import { buildContext, manualCompact } from "../dist/context.js"
 import { Workspace } from "../dist/workspace.js"
-import { deriveModelMessages, Sessions } from "../dist/sessions.js"
+import { deriveModelMessages, lastTurnTools, Sessions } from "../dist/sessions.js"
 import { loadSkill } from "../dist/skills.js"
 import { availableTools } from "../dist/tools.js"
 import { createWebSearch } from "../dist/web-search.js"
@@ -184,6 +184,8 @@ test("web search sends only the query with its own key and works after changing 
   const mock = await provider(t, (body, res, count) => {
     assert.equal(body.model, count <= 2 ? "chat-first" : "chat-second")
     assert.doesNotMatch(JSON.stringify(body), /fixture-separate-search-key/)
+    assert.match(body.messages[0].content, /AnySearch web search is on with an API key configured/)
+    assert.match(body.messages[0].content, /\/search key/)
     assert.ok(body.tools.some(({ function: { name } }) => name === "WebSearch"))
     if (count % 2 === 1) {
       calls(res, "web-" + count, "WebSearch", { query: "release notes " + body.model })
@@ -202,6 +204,17 @@ test("web search sends only the query with its own key and works after changing 
   }
   assert.deepEqual(queries, ["release notes chat-first", "release notes chat-second"])
   assert.doesNotMatch(JSON.stringify(f.session.events), /fixture-separate-search-key/)
+})
+
+test("the model sees whether AnySearch is off or configured for anonymous search", async (t) => {
+  const f = await fixture(t)
+  const options = args(f, { baseUrl: "http://127.0.0.1:12345/v1", model: "mock-model" })
+  const disabled = sessionContext(options)
+  assert.match(disabled.messages[0].content, /AnySearch web search is off.*\/search on/)
+  const anonymous = sessionContext({ ...options, webSearch: createWebSearch() })
+  assert.match(anonymous.messages[0].content, /AnySearch web search is on in anonymous mode/)
+  assert.match(anonymous.messages[0].content, /\/search key.*String Code prompt/)
+  assert.equal(f.session.events.length, 0)
 })
 
 test("AnySearch sends no authorization in anonymous mode and keeps quota credentials out of results", async () => {
@@ -311,6 +324,7 @@ test("skips truncated tool calls and aborts pending approvals without retrying t
   const mock = await provider(t, (body, res, index) => {
     if (index === 3) {
       assert.match(lastTool(body), /interrupted/)
+      assert.ok(body.messages.every((message) => message.role !== "assistant" || message.content || message.tool_calls?.length))
       sse(res, ready)
     } else {
       calls(res, "write-" + index, "WriteFile", { path: "blocked.txt", content: "should never appear" }, index === 1 ? "length" : "tool_calls")
@@ -324,8 +338,28 @@ test("skips truncated tool calls and aborts pending approvals without retrying t
   await assert.rejects(runTurn(args(f, mock.config), "first", new AbortController().signal, ui), /length/)
   assert.equal(ui.events.approvals.length, 0)
   assert.equal(await runTurn(args(f, mock.config), "second", controller.signal, ui), "canceled")
+  assert.equal(lastTurnTools(f.session.events)[0].result, undefined)
   await runTurn(args(f, mock.config), "inspect state", new AbortController().signal, ui)
   await assert.rejects(readFile(path.join(f.workspace.root, "blocked.txt")), { code: "ENOENT" })
+})
+
+test("last-turn tool results stay paired when a provider reuses a tool ID in a later batch", async (t) => {
+  const f = await fixture(t)
+  const duplicateId = "reused-id"
+  const mock = await provider(t, (body, res, count) => {
+    if (count === 1) return calls(res, duplicateId, "Glob", { pattern: "sample.txt" })
+    if (count === 2) return calls(res, duplicateId, "ReadFile", { path: "sample.txt" })
+    assert.match(lastTool(body), /file contents with a distinct marker/)
+    sse(res, ready)
+  })
+  await writeFile(path.join(f.workspace.root, "sample.txt"), "file contents with a distinct marker")
+  await runTurn(args(f, mock.config), "Find and read sample.txt.", new AbortController().signal, userInterface())
+
+  const [glob, read] = lastTurnTools(f.session.events)
+  assert.equal(glob.call.name, "Glob")
+  assert.equal(glob.result, "sample.txt")
+  assert.equal(read.call.name, "ReadFile")
+  assert.match(read.result, /file contents with a distinct marker/)
 })
 
 test("model errors are surfaced and tool support can fall back to text", async (t) => {
@@ -404,6 +438,28 @@ test("sends a requested effort and retries without it when the provider rejects 
   assert.equal(rejected, 1)
   assert.equal(mock.requests.length, 3)
   assert.ok(ui.events.notices.some((notice) => notice.includes("Retrying with its default")))
+})
+
+test("reuses successful gateway compatibility settings after a tool call and on the next turn", async (t) => {
+  const f = await fixture(t)
+  const mock = await provider(t, (body, res, count) => {
+    if (count === 1 || count === 2) {
+      const field = count === 1 ? "stream_options" : "max_tokens"
+      assert.ok(body[field])
+      res.writeHead(400, { "content-type": "application/json" })
+      return res.end(JSON.stringify({ error: { message: "Unsupported parameter: " + field } }))
+    }
+    assert.equal(body.stream_options, undefined)
+    assert.equal(body.max_tokens, undefined)
+    assert.ok(body.max_completion_tokens > 0)
+    if (count === 3) return calls(res, "glob", "Glob", { pattern: "*.txt" })
+    sse(res, ready)
+  })
+  const options = { ...args(f, mock.config), compatibility: {} }
+  const signal = new AbortController().signal
+  assert.equal(await runTurn(options, "Find text files.", signal, userInterface()), "complete")
+  assert.equal(await runTurn(options, "Confirm the result.", signal, userInterface()), "complete")
+  assert.equal(mock.requests.length, 5)
 })
 
 test("workspace tools protect paths, match globs, create files and reject edit conflicts", async (t) => {
