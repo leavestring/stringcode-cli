@@ -12,7 +12,7 @@ import { isMissing } from "./util.js"
 
 export type EventData =
   | { type: "user/message"; content: string }
-  | { type: "assistant/message"; content: string; reasoning?: string; toolCalls: ToolCall[]; usage?: Usage; model: string }
+  | { type: "assistant/message"; content: string; reasoning?: string; toolCalls: ToolCall[]; usage?: Usage; model: string; truncated?: true }
   | { type: "tool/result"; callId: string; content: string }
   | { type: "turn/end"; reason: "complete" | "canceled" | "error" | "limit" }
   | { type: "context/compact"; checkpoint: ContextCheckpoint }
@@ -218,6 +218,7 @@ export function deriveModelMessages(events: SessionEvent[], reasoningModel?: str
       messages.push({ role: "user", content: data.content })
     } else if (data.type === "assistant/message") {
       finishBatch()
+      if (data.truncated) continue
       pending = data.toolCalls
       if (!pending.length && !data.content?.trim()) continue
       messages.push({

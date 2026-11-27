@@ -72,7 +72,7 @@ function runPowerShell(executable: string, command: string, cwd: string, signal:
       reason = cause
       if (child.pid && process.platform === "win32") {
         const taskkill = path.join(process.env.SystemRoot || "C:\\Windows", "System32", "taskkill.exe")
-      const killTree = spawn(taskkill, ["/PID", String(child.pid), "/T", "/F"], { env, windowsHide: true, stdio: "ignore" })
+        const killTree = spawn(taskkill, ["/PID", String(child.pid), "/T", "/F"], { env, windowsHide: true, stdio: "ignore" })
         killTree.on("error", () => child.kill())
         killTree.on("exit", (code) => { if (code !== 0) child.kill() })
       } else {
@@ -117,7 +117,8 @@ export async function executeShell(
   const executable = process.platform === "win32" ? await findWindowsShell(workspaceRoot) : "pwsh"
   const result = await runPowerShell(executable, command, cwd, signal, timeoutMs, apiKey)
   signal.throwIfAborted()
-  const status = result.reason === "timeout" ? "Shell timed out after " + timeoutMs + " ms. Check workspace state before retrying."
+  const status = result.reason === "timeout" ? "Shell timed out after " + timeoutMs +
+    " ms. Check for partial files or checkpoints. If more work is needed, run a smaller sample or batch before retrying the full command."
     : "Exit: " + (result.code ?? result.signal ?? "unknown")
   return result.output ? status + "\n" + result.output : status
 }

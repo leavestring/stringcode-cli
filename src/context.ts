@@ -149,6 +149,7 @@ function systemPrompt(workspace: string, mode: Mode, approved: boolean, skills: 
     "You are String Code, a terminal coding assistant. Reply in the user's language.",
     "Workspace: " + JSON.stringify(workspace),
     "Read the relevant code before editing. Say what actually ran and report failures accurately.",
+    "For implementation tasks, get the smallest working result in place and run a focused check before expensive searches or full test suites.",
     "After using tools, give the user a final reply that states the outcome, what was verified, and any remaining work. Base completion claims on the recorded results.",
     mode === "auto"
       ? "Shell runs PowerShell as the current OS user. Use it only for the task authorized by the latest user request."
@@ -194,17 +195,19 @@ export function buildContext(options: {
   contextWindow?: number
   reasoningModel?: string
   searchStatus?: string
-  finalInstruction?: string
+  instruction?: string
+  expandOutput?: boolean
 }): { messages: ModelMessage[]; snapshot: Snapshot; checkpoint?: ContextCheckpoint } {
   const { checkpoint, turns } = transcript(options.events, options.reasoningModel)
   const system = [
     systemPrompt(options.workspace, options.mode, options.planApproved, options.skills),
     options.searchStatus && options.searchStatus + " The user can enter /search to inspect it or /search key to configure it. " +
       "These commands run at the String Code prompt. Direct the user there for configuration and keep keys out of chat.",
-    options.finalInstruction,
+    options.instruction,
   ].filter(Boolean).join("\n\n")
   const window = options.contextWindow ?? 32_000
-  const outputReserve = Math.min(8_192, Math.max(256, Math.floor(window * 0.1)))
+  const defaultOutput = Math.max(256, Math.floor(window * 0.1))
+  const outputReserve = Math.min(8_192, options.expandOutput ? defaultOutput * 2 : defaultOutput)
   const inputLimit = window - outputReserve - Math.min(2_048, Math.ceil(window * 0.04))
   const overhead = estimateMessageTokens(system) + estimateTokens(JSON.stringify(options.tools))
   const remaining = inputLimit - overhead

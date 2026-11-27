@@ -17,6 +17,7 @@ const filePath = z.string().min(1).max(2000)
 const rootPath = filePath.optional()
 const count = (max: number) => z.number().int().min(1).max(max).optional()
 const fileText = z.string().max(fileLimit)
+const defaultShellTimeout = 120_000
 
 export interface ToolContext {
   workspace: Workspace
@@ -213,18 +214,25 @@ const tools = [
     if (previous.indexOf(args.old_text, start + 1) >= 0) throw new Error("old_text matches more than once. Use a larger excerpt.")
     return previous.slice(0, start) + args.new_text + previous.slice(start + args.old_text.length)
   }, context)),
-  tool("Shell", "Run a non-interactive PowerShell command. Use a workspace directory.", z.strictObject({
+  tool("Shell", "Run a non-interactive PowerShell command in a workspace directory. " +
+    "For expensive commands, validate a small sample first and save progress in bounded batches.", z.strictObject({
     command: z.string().min(1).max(3500).refine((value) => value.trim() !== "" && !value.includes("\0"), "Enter a PowerShell command."),
-    cwd: rootPath, timeout_ms: z.number().int().min(100).max(300_000).optional(),
+    cwd: rootPath,
+    timeout_ms: z.number().int().min(100).max(300_000).optional().describe(
+      "Timeout in milliseconds (100 to 300000, default " + defaultShellTimeout + "). Use a short timeout for probes."),
   }), "shell", async (args, context) => {
     const requested = args.cwd ?? "."
     const cwd = await context.workspace.resolve(requested)
     if (!(await stat(cwd)).isDirectory()) throw new Error("Shell cwd must be a directory.")
+    const timeoutMs = args.timeout_ms ?? defaultShellTimeout
     return {
-      approval: { title: "Run PowerShell", detail: "Directory: " + cwd + "\nCommand:\n" + args.command, kind: "command" },
+      approval: {
+        title: "Run PowerShell", kind: "command",
+        detail: "Directory: " + cwd + "\nTimeout: " + timeoutMs + " ms\nCommand:\n" + args.command,
+      },
       async execute() {
         if (await context.workspace.resolve(requested) !== cwd) throw new Error("Shell directory changed.")
-        return executeShell(args.command, cwd, context.workspace.root, context.signal, args.timeout_ms ?? 120_000, context.apiKey)
+        return executeShell(args.command, cwd, context.workspace.root, context.signal, timeoutMs, context.apiKey)
       },
     }
   }),

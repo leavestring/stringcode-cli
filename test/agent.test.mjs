@@ -319,15 +319,48 @@ test("marks a failed request as historical when a fresh message follows", async 
   assert.equal(ui.events.approvals.length, 0)
 })
 
-test("skips truncated tool calls and aborts pending approvals without retrying them", async (t) => {
+test("recovers from one output limit using recorded results without replaying a write", async (t) => {
   const f = await fixture(t)
   const mock = await provider(t, (body, res, index) => {
+    if (index === 1) {
+      assert.equal(body.max_tokens, 3200)
+      return calls(res, "initial", "WriteFile", { path: "result.txt", content: "initial result" })
+    }
+    if (index === 2) {
+      assert.match(lastTool(body), /Saved result.txt/)
+      return sse(res, { choices: [{ delta: { content: "Unfinished draft", tool_calls: [{
+        index: 0, id: "truncated-call-fixture", function: { arguments: '{"path":' },
+      }] }, finish_reason: "length" }] })
+    }
+    assert.equal(body.max_tokens, 6400)
     if (index === 3) {
+      assert.match(body.messages[0].content, /previous model response hit its output limit/)
+      assert.match(lastTool(body), /Saved result.txt/)
+      assert.doesNotMatch(JSON.stringify(body), /Unfinished draft|truncated-call-fixture/)
+      return calls(res, "recover", "ReadFile", { path: "result.txt" })
+    }
+    assert.match(lastTool(body), /initial result/)
+    assert.doesNotMatch(body.messages[0].content, /previous model response hit its output limit/)
+    sse(res, ready)
+  })
+  const ui = userInterface()
+  assert.equal(await runTurn(args(f, mock.config), "Write and verify a result.", AbortSignal.timeout(5000), ui), "complete")
+  assert.equal(mock.requests.length, 4)
+  assert.equal(ui.events.approvals.length, 1)
+  assert.equal(ui.events.notices.filter((notice) => /output limit/.test(notice)).length, 1)
+  assert.equal(await readFile(path.join(f.workspace.root, "result.txt"), "utf8"), "initial result")
+  assert.ok(f.session.events.some(({ data }) => data.truncated && data.content === "Unfinished draft"))
+})
+
+test("skips truncated tool calls and bounds recovery while pending approvals remain cancelable", async (t) => {
+  const f = await fixture(t)
+  const mock = await provider(t, (body, res, index) => {
+    if (index === 4) {
       assert.match(lastTool(body), /interrupted/)
       assert.ok(body.messages.every((message) => message.role !== "assistant" || message.content || message.tool_calls?.length))
       sse(res, ready)
     } else {
-      calls(res, "write-" + index, "WriteFile", { path: "blocked.txt", content: "should never appear" }, index === 1 ? "length" : "tool_calls")
+      calls(res, "write-" + index, "WriteFile", { path: "blocked.txt", content: "should never appear" }, index <= 2 ? "length" : "tool_calls")
     }
   })
   const controller = new AbortController()
@@ -336,11 +369,56 @@ test("skips truncated tool calls and aborts pending approvals without retrying t
     return true
   })
   await assert.rejects(runTurn(args(f, mock.config), "first", new AbortController().signal, ui), /length/)
+  assert.equal(mock.requests.length, 2)
+  assert.deepEqual(lastTurnTools(f.session.events), [])
   assert.equal(ui.events.approvals.length, 0)
   assert.equal(await runTurn(args(f, mock.config), "second", controller.signal, ui), "canceled")
   assert.equal(lastTurnTools(f.session.events)[0].result, undefined)
   await runTurn(args(f, mock.config), "inspect state", new AbortController().signal, ui)
   await assert.rejects(readFile(path.join(f.workspace.root, "blocked.txt")), { code: "ENOENT" })
+})
+
+test("recovers from the WorkBuddy output-limit error frame", async (t) => {
+  const f = await fixture(t)
+  const mock = await provider(t, (body, res, index) => {
+    if (index === 1) {
+      res.writeHead(200, { "content-type": "text/event-stream" })
+      res.end("data: " + JSON.stringify({ error: { message:
+        "WorkBuddy: an empty reply (the model answered nothing; try again) — cut at its length, the whole output spent on reasoning",
+      } }) + "\n\n")
+    } else {
+      assert.match(body.messages[0].content, /previous model response hit its output limit/)
+      assert.equal(body.max_tokens, 6400)
+      sse(res, ready)
+    }
+  })
+  const ui = userInterface()
+  const signal = AbortSignal.timeout(5000)
+  assert.equal(await runTurn(args(f, mock.config), "Summarize the task.", signal, ui), "complete")
+  assert.equal(mock.requests.length, 2)
+  assert.equal(ui.events.text, "Done.")
+})
+
+test("feeds PowerShell timeout and checkpoint guidance back into the same turn", { skip: process.platform !== "win32" }, async (t) => {
+  const f = await fixture(t)
+  const mock = await provider(t, (body, res, index) => {
+    if (index === 1) {
+      const shell = body.tools.find(({ function: tool }) => tool.name === "Shell").function
+      assert.match(shell.description, /small sample/)
+      assert.match(shell.parameters.properties.timeout_ms.description, /100 to 300000, default 120000/)
+      return calls(res, "long", "Shell", { command: "Write-Output 'checkpoint logged'; Start-Sleep -Seconds 20", timeout_ms: 2000 })
+    }
+    if (index === 2) {
+      assert.match(lastTool(body), /timed out after 2000 ms[\s\S]*partial files or checkpoints[\s\S]*smaller sample or batch[\s\S]*checkpoint logged/)
+      return calls(res, "probe", "Shell", { command: "Write-Output 'small probe passed'", timeout_ms: 5000 })
+    }
+    assert.match(lastTool(body), /Exit: 0[\s\S]*small probe passed/)
+    sse(res, ready)
+  })
+  const ui = userInterface()
+  assert.equal(await runTurn(args(f, mock.config), "Run a check.", AbortSignal.timeout(15_000), ui), "complete")
+  assert.equal(mock.requests.length, 3)
+  assert.deepEqual(ui.events.approvals.map(({ detail }) => detail.match(/Timeout: \d+ ms/)?.[0]), ["Timeout: 2000 ms", "Timeout: 5000 ms"])
 })
 
 test("last-turn tool results stay paired when a provider reuses a tool ID in a later batch", async (t) => {

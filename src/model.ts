@@ -104,7 +104,13 @@ async function consume(
     const envelope = parseEnvelope(data)
     if (envelope.error) {
       const detail = typeof envelope.error === "string" ? envelope.error : envelope.error.message
-      throw new Error("Model stream error: " + (errorDetail(detail, apiKey) || "unknown error"))
+      const description = errorDetail(detail, apiKey)
+      if (/^WorkBuddy: an empty reply\b.*\bcut at its length\b/i.test(description)) {
+        result.finish = "length"
+        done = true
+        return
+      }
+      throw new Error("Model stream error: " + (description || "unknown error"))
     }
     if (envelope.usage) {
       const input = tokenCount(envelope.usage.prompt_tokens)
@@ -149,7 +155,10 @@ async function consume(
     ingest(await response.text())
     done = true
   } else if (contentType.includes("ndjson") || contentType.includes("jsonl")) {
-    for await (const line of readJsonLines(response.body)) ingest(line)
+    for await (const line of readJsonLines(response.body)) {
+      ingest(line)
+      if (done) break
+    }
   } else {
     for await (const { data, event } of readServerSentEvents(response.body)) {
       if (data.trim() === "[DONE]") {
@@ -157,10 +166,12 @@ async function consume(
         break
       }
       if (event !== "ping" && data.trim()) ingest(data)
+      if (done) break
     }
   }
 
   if (!done && !result.finish) throw new Error("Model stream ended before completion. No pending tools were executed.")
+  if (result.finish === "length") return result
   const ids = new Set<string>()
   for (const [, call] of [...calls].sort(([left], [right]) => left - right)) {
     if (!call.name) throw new Error("The model returned an incomplete tool call.")
@@ -168,7 +179,7 @@ async function consume(
     ids.add(call.id)
     result.toolCalls.push({ ...call, arguments: call.arguments || "{}" })
   }
-  if (!result.content && result.toolCalls.length === 0 && result.finish !== "length") {
+  if (!result.content && result.toolCalls.length === 0) {
     throw new Error("The model returned neither a response nor a tool call.")
   }
   return result

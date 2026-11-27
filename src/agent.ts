@@ -38,8 +38,14 @@ export interface AgentOptions {
 const stepLimit = 24
 const finalInstruction = "The tool step limit has been reached. Give the user a concise final status based on the recorded tool results. " +
   "State what completed, what failed or remains unverified, and what is still needed. No further tools are available."
+const lengthRecovery = "The previous model response hit its output limit and its tool calls were discarded. " +
+  "Continue the current request from the recorded results. Keep the next response concise. " +
+  "For tool work, issue a small, complete call for the next useful action."
 
-export function sessionContext(options: Omit<AgentOptions, "apiKey">, approved = false, finalizing = false) {
+export function sessionContext(
+  options: Omit<AgentOptions, "apiKey">, approved = false, finalizing = false,
+  recovery: { instruction?: string; expandOutput?: boolean } = {},
+) {
   const { config, mode, session, workspace, webSearch } = options
   const tools = finalizing ? [] : availableTools(mode, approved, Boolean(webSearch)).map((tool) => tool.definition)
   return buildContext({
@@ -47,7 +53,8 @@ export function sessionContext(options: Omit<AgentOptions, "apiKey">, approved =
     skills: session.skills, tools, contextWindow: config.contextWindow,
     reasoningModel: new URL(config.baseUrl).hostname === "api.deepseek.com" ? config.model : undefined,
     searchStatus: webSearchStatus(webSearch),
-    finalInstruction: finalizing ? finalInstruction : undefined,
+    instruction: finalizing ? finalInstruction : recovery.instruction,
+    expandOutput: recovery.expandOutput,
   })
 }
 
@@ -97,6 +104,8 @@ export async function runTurn(
   const compatibility = options.compatibility ?? {}
   let approved = false
   let effort = options.effort ?? "auto"
+  let recoveredLength = false
+  let retryingLength = false
   let reason: "complete" | "canceled" | "error" | "limit" = "error"
   await session.append({ type: "user/message", content: redact(prompt, apiKey) })
   try {
@@ -108,7 +117,13 @@ export async function runTurn(
         ui.notice("Step limit reached after " + stepLimit + " model requests. Summarizing recorded results.")
       }
       const requestedTools = finalizing ? [] : availableTools(mode, approved, Boolean(webSearch))
-      const packed = sessionContext(options, approved, finalizing)
+      const instruction = retryingLength ? lengthRecovery : undefined
+      const expandOutput = recoveredLength && !finalizing && compatibility.outputTokenField !== null
+      let packed = sessionContext(options, approved, finalizing, { instruction, expandOutput })
+      if (expandOutput && packed.snapshot.overBudget) {
+        packed = sessionContext(options, approved, finalizing, { instruction })
+      }
+      retryingLength = false
       ui.context(packed.snapshot)
       if (packed.snapshot.overBudget) {
         throw new Error("This turn exceeds the estimated input budget. Shorten the prompt or select a larger context window.")
@@ -138,6 +153,7 @@ export async function runTurn(
       requestSignal.throwIfAborted()
       stream.finish()
       if (model.usage) ui.usage?.(model.usage)
+      const truncated = model.finish === "length"
       const safeToRun = !model.finish || model.finish === "stop" || model.finish === "tool_calls"
       if (finalizing && (model.toolCalls.length || !model.content.trim() || (model.finish && model.finish !== "stop"))) {
         throw new Error("The provider did not return a complete text summary.")
@@ -155,10 +171,17 @@ export async function runTurn(
       await session.append({
         type: "assistant/message", content: redact(model.content, apiKey), reasoning: redact(model.reasoning, apiKey),
         toolCalls: parsedCalls.map(({ stored }) => stored), usage: model.usage, model: options.config.model,
+        ...(truncated ? { truncated: true } : {}),
       })
       if (finalizing) {
         ui.text(redact(model.content, apiKey))
         return "limit"
+      }
+      if (truncated && !recoveredLength && step + 1 < stepLimit) {
+        recoveredLength = true
+        retryingLength = true
+        ui.notice("Model response reached its output limit. Retrying once from recorded results.")
+        continue
       }
       if (!safeToRun) throw new Error("Model stopped (" + redact(model.finish, apiKey) + "). Pending tools were skipped.")
       if (calls.length === 0) {
