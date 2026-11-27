@@ -17,10 +17,10 @@ stringcode --version
 
 ### Install from GitHub Releases
 
-You can also download `stringcode-cli-0.4.1.tgz` from [GitHub Releases](https://github.com/leavestring/stringcode-cli/releases) and run the following command in PowerShell from the download directory.
+You can also download `stringcode-cli-0.4.2.tgz` from [GitHub Releases](https://github.com/leavestring/stringcode-cli/releases) and run the following command in PowerShell from the download directory.
 
 ~~~powershell
-npm install -g .\stringcode-cli-0.4.1.tgz
+npm install -g .\stringcode-cli-0.4.2.tgz
 ~~~
 
 See the [changelog](CHANGELOG.md) for version history.
@@ -103,7 +103,7 @@ npm test
 npm start
 ~~~
 
-`npm run build` compiles TypeScript into `dist/`. Run `npm pack` to build an installable package, then `npm install -g .\stringcode-cli-0.4.1.tgz` to install it globally.
+`npm run build` compiles TypeScript into `dist/`. Run `npm pack` to build an installable package, then `npm install -g .\stringcode-cli-0.4.2.tgz` to install it globally.
 
 ## License and code origins
 

@@ -1,6 +1,6 @@
 {
   "name": "stringcode-cli",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "A Windows Terminal coding agent with your own model provider and PowerShell approvals",
   "type": "module",
   "bin": {

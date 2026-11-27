@@ -17,10 +17,10 @@ stringcode --version
 
 ### 从 GitHub Release 安装
 
-也可以从 [GitHub Releases](https://github.com/leavestring/stringcode-cli/releases) 下载 `stringcode-cli-0.4.1.tgz`，在下载目录打开 PowerShell 并运行以下命令。
+也可以从 [GitHub Releases](https://github.com/leavestring/stringcode-cli/releases) 下载 `stringcode-cli-0.4.2.tgz`，在下载目录打开 PowerShell 并运行以下命令。
 
 ~~~powershell
-npm install -g .\stringcode-cli-0.4.1.tgz
+npm install -g .\stringcode-cli-0.4.2.tgz
 ~~~
 
 版本变更见 [更新日志](CHANGELOG.md)。
@@ -103,7 +103,7 @@ npm test
 npm start
 ~~~
 
-`npm run build` 将 TypeScript 编译到 `dist/`。运行 `npm pack` 可打包当前源码，再用 `npm install -g .\stringcode-cli-0.4.1.tgz` 安装到全局。
+`npm run build` 将 TypeScript 编译到 `dist/`。运行 `npm pack` 可打包当前源码，再用 `npm install -g .\stringcode-cli-0.4.2.tgz` 安装到全局。
 
 ## 许可证与代码来源
 
